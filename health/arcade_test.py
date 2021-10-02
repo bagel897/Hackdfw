@@ -13,7 +13,6 @@ from typing import List
 import arcade
 import arcade.gui
 
-import health.backend
 from health import backend
 
 SCREEN_WIDTH = 1920
@@ -22,23 +21,24 @@ SCREEN_TITLE = "Vitality Trainer"
 FOOD_FILE = "health/data/food.csv"
 LAYER_NAME_FOOD = "food"
 LAYER_NAME_PLAYER = "player"
-PLAYER_MOVEMENT_SPEED = 5
+LAYER_NAME_HEALTHBAR = "bar"
+LAYER_NAME_TEXT = "text"
 START = 0
 STOP = math.pi
-CENTER_X = SCREEN_WIDTH / 2
-CENTER_Y = SCREEN_HEIGHT / 2
-RADIUS = 200
+CENTER_X: int = int(SCREEN_WIDTH / 2)
+CENTER_Y: int = int(SCREEN_HEIGHT / 2)
+INDENT_X: int = 400
+INDENT_Y: int = 300
+BALLOON_START: int = 100
 
 
 def position_sprites(sprites: List[arcade.Sprite], scene: arcade.Scene):
-    degrees = [STOP / len(sprites) * x + START for x in range(0, len(sprites))]
+    spacing = int(INDENT_X * 2 / (len(sprites) - 1))
+    positons = range(int(CENTER_X - INDENT_X), int(CENTER_X + INDENT_X + spacing), spacing)
     for i, sprite in enumerate(sprites):
-        sprite.center_x = CENTER_X + math.cos(degrees[i]) * RADIUS
-        sprite.center_y = CENTER_Y + math.sin(degrees[i]) * RADIUS
+        sprite.center_x = positons[i]
+        sprite.center_y = CENTER_Y + INDENT_Y
         scene.add_sprite(LAYER_NAME_FOOD, sprite)
-
-
-backend = backend.Backend(FOOD_FILE)
 
 
 class MyGame(arcade.Window):
@@ -49,10 +49,19 @@ class MyGame(arcade.Window):
     If you do need a method, delete the 'pass' and replace it
     with your own code. Don't leave 'pass' in this program.
     """
-    foodlist: List[health.backend.food]
-
+    foodlist: List[backend.food]
+    manager: arcade.gui.UIManager
+    player: backend.player
+    scene: arcade.Scene
+    FOOD_PLACED: bool = False
+    BAR_PLACED: bool = False
+    gameBackend: backend.Backend
+    healthSprite: arcade.Sprite
+    healthBar: backend.healthBar
+    SETUP: bool = False
+    TEXT_PLACED: bool = False
     def __init__(self, width, height, title):
-        super().__init__(width, height, title)
+        super().__init__(width, height, title, vsync=True)
 
         arcade.set_background_color(arcade.color.WHITE)
         self.left_pressed = False
@@ -65,24 +74,41 @@ class MyGame(arcade.Window):
         # and set them to None
 
     def get_food(self):
-        self.foodlist = backend.get_food()
+        if self.FOOD_PLACED:
+            self.scene.remove_sprite_list_by_name(LAYER_NAME_FOOD)
+        self.foodlist = self.gameBackend.get_food()
+        position_sprites(self.foodlist, self.scene)
+        self.FOOD_PLACED = True
 
     def setup(self):
         """ Set up the game variables. Call to re-start the game. """
         # Create your sprites and sprite lists here
+        self.FOOD_PLACED = False
+        self.BAR_PLACED = False
+        self.gameBackend = backend.Backend(FOOD_FILE)
+        arcade.set_background_color(arcade.color.WHITE)
         self.manager = arcade.gui.UIManager()
         self.manager.enable()
-        self.player = backend.player
+        self.player = self.gameBackend.get_player()
         self.scene = arcade.scene.Scene()
         self.get_food()
-        position_sprites(self.foodlist, self.scene)
         self.reset_player()
         self.scene.add_sprite(LAYER_NAME_PLAYER, self.player)
+        self.healthBar = backend.healthBar(self.player)
         self.physics_engine = arcade.PhysicsEngineSimple(self.player, [])
-        self.on_click_open(None)
+        self.SETUP = True
+
+    def getBar(self):
+        if self.BAR_PLACED:
+            self.scene.remove_sprite_list_by_name(LAYER_NAME_HEALTHBAR)
+        self.healthBar.get_image()
+        self.healthSprite = self.healthBar.sprite
+        self.healthSprite.center_x = (self.healthSprite.width / 2) + 20
+        self.healthSprite.center_y = self.healthSprite.height / 2 + 27
+        self.scene.add_sprite(LAYER_NAME_HEALTHBAR, self.healthSprite)
 
     def reset_player(self):
-        self.player.center_y = SCREEN_HEIGHT / 2
+        self.player.center_y = SCREEN_HEIGHT / 2 - BALLOON_START
         self.player.center_x = SCREEN_WIDTH / 2
 
     def on_draw(self):
@@ -93,8 +119,17 @@ class MyGame(arcade.Window):
         # This command should happen before we start drawing. It will clear
         # the screen to the background color, and erase what we drew last frame.
         arcade.start_render()
-        self.scene.draw()
         self.manager.draw()
+        self.scene.draw()
+        if self.TEXT_PLACED:
+            self.scene.remove_sprite_list_by_name(LAYER_NAME_TEXT)
+        if self.SETUP:
+
+            text = arcade.text_pillow.create_text_sprite(self.gameBackend.get_text(), SCREEN_WIDTH - INDENT_X, 100,
+                                                         color=arcade.color.BLUE,
+                                                         font_size=12, width=INDENT_X)
+            self.scene.add_sprite(LAYER_NAME_TEXT, text)
+            self.TEXT_PLACED = True
         # Call draw() on all your sprite lists below
 
     def on_update(self, delta_time):
@@ -106,12 +141,13 @@ class MyGame(arcade.Window):
 
         self.physics_engine.update()
         food_collisions = self.player.collides_with_list(self.scene.get_sprite_list(LAYER_NAME_FOOD))
+        self.getBar()
         for food in food_collisions:
             self.reset_player()
             self.player.eatFood(food)
-        if self.player.happiness < 0:
+            self.get_food()
+        if self.player.motivation < 0:
             self.game_over()
-        self.get_food()
 
     def on_key_press(self, key, key_modifiers):
         """
@@ -122,13 +158,13 @@ class MyGame(arcade.Window):
         """
 
         if key == arcade.key.UP or key == arcade.key.W:
-            self.player.change_y = PLAYER_MOVEMENT_SPEED
+            self.player.change_y = self.player.getSpeed()
         elif key == arcade.key.DOWN or key == arcade.key.S:
-            self.player.change_y = -PLAYER_MOVEMENT_SPEED
+            self.player.change_y = -self.player.getSpeed()
         elif key == arcade.key.LEFT or key == arcade.key.A:
-            self.player.change_x = -PLAYER_MOVEMENT_SPEED
+            self.player.change_x = -self.player.getSpeed()
         elif key == arcade.key.RIGHT or key == arcade.key.D:
-            self.player.change_x = PLAYER_MOVEMENT_SPEED
+            self.player.change_x = self.player.getSpeed()
 
     def on_key_release(self, key, key_modifiers):
         """
@@ -157,10 +193,6 @@ class MyGame(arcade.Window):
         """
 
         pass
-
-    def on_click_open(self, event):
-        messagebox = arcade.gui.UIMessageBox(width=300, height=200, message_text="Hello There Vin")
-        self.manager.add(messagebox)
 
     def game_over(self):
         messagebox = arcade.gui.UIMessageBox(width=300, height=200, message_text="You Lost")
