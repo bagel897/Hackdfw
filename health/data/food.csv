@@ -1,4 +1,10 @@
-bannana,6,3,banana.gif
-apple,6,3,banana.gif
-orange,7 ,3,banana.gif
-pie,4,7,pie.jpg
+banana,1,-1,FoodBanana.jpg
+bacon,-4,3,FoodBacon.jpg
+cherries,1,-1,FoodCherries.jpg
+rage,-5,1,FoodEnergyDrink.jpg
+fruitjuice,-3,1,FoodFruitjuice.jpg
+kiwi,1,-1,FoodKiwi.jpg
+pancakes,-2,0,FoodPancakes.jpg
+pasta,-2,1,FoodPasta.jpg
+tofu,2,-3,FoodTofu.jpg
+chicken,-3,2,FoodChicken.jpg
