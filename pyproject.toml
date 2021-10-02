@@ -6,7 +6,8 @@ authors = ["bageljr <aryanagarwal897@gmail.com>"]
 
 [tool.poetry.dependencies]
 python = "^3.9"
-pygame = "^2.0.1"
+arcade = "^2.6.3"
+pylint = "^2.11.1"
 
 [tool.poetry.dev-dependencies]
 
