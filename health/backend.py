@@ -1,7 +1,9 @@
 import csv
 import random
-from dataclasses import dataclass
-from typing import List
+from dataclasses import dataclass, field
+from typing import List, Union
+import pygame
+from pygame.surface import SurfaceType
 
 
 @dataclass
@@ -9,7 +11,14 @@ class food:
     name: str
     health: int
     hapiness: int
-    # image: str #TODO
+    image_file: str  # TODO
+    game_object: Union[pygame.Surface, SurfaceType] = field(init=False)
+
+    def __post_init__(self):
+        self.game_object = pygame.image.load(f"health/imgs/{self.image_file}")
+
+    def get_rect(self):
+        return self.game_object.get_rect()
 
 
 class Backend:
@@ -34,7 +43,7 @@ def read_food_from_file(filename: str) -> List[food]:
         for row in rows:
             if not row:
                 break
-            results.append(food(row[0], row[1], row[2]))
+            results.append(food(row[0], row[1], row[2], row[3]))
     return results
 
 
