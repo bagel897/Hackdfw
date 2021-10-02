@@ -7,7 +7,7 @@ import arcade.gui
 import pygame as pygame
 from PIL import Image
 
-FOOD_SCALE = 100
+FOOD_SCALE = 300
 
 ACTION_SCALE = 100
 
@@ -26,8 +26,8 @@ class food(arcade.Sprite):
         self.health = int(line[1])
         self.motivation = int(line[2])
         self.image_file = line[3]
-        scale = FOOD_SCALE / Image.open(f"health/imgs/{self.image_file}").size[0]
-        super().__init__(f"health/imgs/{self.image_file}", scale=scale)
+        scale = FOOD_SCALE / Image.open(f"health/imgs/FoodEvents/{self.image_file}").size[0]
+        super().__init__(f"health/imgs/FoodEvents/{self.image_file}", scale=scale)
 
 
 class HEALTH(enum.Enum):
@@ -52,7 +52,7 @@ class player(arcade.Sprite):
         super().__init__(f"health/imgs/{self.image_file}")
 
     def eatFood(self, food: food):
-        self.motivation = max(min(self.motivation + food.motivation, 10), 0)
+        self.motivation = max(min(self.motivation + food.motivation, 10), -10)
         self.health = max(min(self.health + food.health, 10), 0)
 
     def getHealth(self) -> HEALTH:

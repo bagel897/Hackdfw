@@ -22,20 +22,22 @@ FOOD_FILE = "health/data/food.csv"
 LAYER_NAME_FOOD = "food"
 LAYER_NAME_PLAYER = "player"
 LAYER_NAME_HEALTHBAR = "bar"
+LAYER_NAME_TEXT = "text"
 START = 0
 STOP = math.pi
 CENTER_X: int = int(SCREEN_WIDTH / 2)
 CENTER_Y: int = int(SCREEN_HEIGHT / 2)
-INDENT: int = 300
-gameBackend = backend.Backend(FOOD_FILE)
+INDENT_X: int = 400
+INDENT_Y: int = 300
+BALLOON_START: int = 100
 
 
 def position_sprites(sprites: List[arcade.Sprite], scene: arcade.Scene):
-    spacing = int(INDENT * 2 / (len(sprites) - 1))
-    positons = range(int(CENTER_X - INDENT), int(CENTER_X + INDENT + spacing), spacing)
+    spacing = int(INDENT_X * 2 / (len(sprites) - 1))
+    positons = range(int(CENTER_X - INDENT_X), int(CENTER_X + INDENT_X + spacing), spacing)
     for i, sprite in enumerate(sprites):
         sprite.center_x = positons[i]
-        sprite.center_y = CENTER_Y + INDENT
+        sprite.center_y = CENTER_Y + INDENT_Y
         scene.add_sprite(LAYER_NAME_FOOD, sprite)
 
 
@@ -49,11 +51,15 @@ class MyGame(arcade.Window):
     """
     foodlist: List[backend.food]
     manager: arcade.gui.UIManager
-    player: gameBackend.player
+    player: backend.player
     scene: arcade.Scene
     FOOD_PLACED: bool = False
     BAR_PLACED: bool = False
-
+    gameBackend: backend.Backend
+    healthSprite: arcade.Sprite
+    healthBar: backend.healthBar
+    SETUP: bool = False
+    TEXT_PLACED: bool = False
     def __init__(self, width, height, title):
         super().__init__(width, height, title, vsync=True)
 
@@ -70,7 +76,7 @@ class MyGame(arcade.Window):
     def get_food(self):
         if self.FOOD_PLACED:
             self.scene.remove_sprite_list_by_name(LAYER_NAME_FOOD)
-        self.foodlist = gameBackend.get_food()
+        self.foodlist = self.gameBackend.get_food()
         position_sprites(self.foodlist, self.scene)
         self.FOOD_PLACED = True
 
@@ -79,17 +85,18 @@ class MyGame(arcade.Window):
         # Create your sprites and sprite lists here
         self.FOOD_PLACED = False
         self.BAR_PLACED = False
-
+        self.gameBackend = backend.Backend(FOOD_FILE)
         arcade.set_background_color(arcade.color.WHITE)
         self.manager = arcade.gui.UIManager()
         self.manager.enable()
-        self.player = gameBackend.get_player()
+        self.player = self.gameBackend.get_player()
         self.scene = arcade.scene.Scene()
         self.get_food()
         self.reset_player()
         self.scene.add_sprite(LAYER_NAME_PLAYER, self.player)
         self.healthBar = backend.healthBar(self.player)
         self.physics_engine = arcade.PhysicsEngineSimple(self.player, [])
+        self.SETUP = True
 
     def getBar(self):
         if self.BAR_PLACED:
@@ -101,7 +108,7 @@ class MyGame(arcade.Window):
         self.scene.add_sprite(LAYER_NAME_HEALTHBAR, self.healthSprite)
 
     def reset_player(self):
-        self.player.center_y = SCREEN_HEIGHT / 2
+        self.player.center_y = SCREEN_HEIGHT / 2 - BALLOON_START
         self.player.center_x = SCREEN_WIDTH / 2
 
     def on_draw(self):
@@ -114,7 +121,15 @@ class MyGame(arcade.Window):
         arcade.start_render()
         self.manager.draw()
         self.scene.draw()
-        arcade.draw_text(self.backend.get_text(), 300, 0, color=arcade.color.BLUE, font_size=12)
+        if self.TEXT_PLACED:
+            self.scene.remove_sprite_list_by_name(LAYER_NAME_TEXT)
+        if self.SETUP:
+
+            text = arcade.text_pillow.create_text_sprite(self.gameBackend.get_text(), SCREEN_WIDTH - INDENT_X, 100,
+                                                         color=arcade.color.BLUE,
+                                                         font_size=12, width=INDENT_X)
+            self.scene.add_sprite(LAYER_NAME_TEXT, text)
+            self.TEXT_PLACED = True
         # Call draw() on all your sprite lists below
 
     def on_update(self, delta_time):
