@@ -1,56 +1,80 @@
 import csv
 import enum
-import math
 import random
-from dataclasses import dataclass, field
-from typing import List, Union
+from typing import List
 import arcade
+import arcade.gui
+import pygame as pygame
 from PIL import Image
+
+FOOD_SCALE = 100
+
+ACTION_SCALE = 100
+
+MOTIVATION_LOSS: int = 5
+HEALTH_LOSS: int = 5
 
 
 class food(arcade.Sprite):
     name: str
     health: int
-    happiness: int
+    motivation: int
     image_file: str
 
     def __init__(self, line: List[str]):
         self.name = line[0]
         self.health = int(line[1])
-        self.happiness = int(line[2])
+        self.motivation = int(line[2])
         self.image_file = line[3]
-        scale = 100 / Image.open(f"health/imgs/{self.image_file}").size[0]
-        super().__init__(f"health/imgs/{self.image_file}", scale=scale, hit_box_algorithm="Detailed")
+        scale = FOOD_SCALE / Image.open(f"health/imgs/{self.image_file}").size[0]
+        super().__init__(f"health/imgs/{self.image_file}", scale=scale)
+
 
 class HEALTH(enum.Enum):
-    SAD = 1
-    OK = 2
-    HAPPY = 3
+    SAD = 0
+    OK = 1
+    HAPPY = 2
+
+
+class MOTIVATION(enum.Enum):
+    SAD = 0
+    OK = 1
+    HAPPY = 2
 
 
 class player(arcade.Sprite):
-    happiness: int = 7
+    motivation: int = 7
     health: int = 7
-    HAPPINESS_LOSS: int = 5
-    HEALTH_LOSS: int = 15
-    image_file: str = "banana.gif"
+
+    image_file: str = "Avatars/SelecterAvatar.jpg"
 
     def __init__(self):
         super().__init__(f"health/imgs/{self.image_file}")
 
     def eatFood(self, food: food):
-        self.happiness = min(self.happiness + food.happiness - self.HAPPINESS_LOSS, 10)
-        self.health += food.health
+        self.motivation = max(min(self.motivation + food.motivation, 10), 0)
+        self.health = max(min(self.health + food.health, 10), 0)
 
-    def endDay(self) -> HEALTH:
-        self.health -= self.HEALTH_LOSS
-        health = self.health + random.randint(-1, 1)
+    def getHealth(self) -> HEALTH:
+        health = self.health
         if health < 4:
             return HEALTH.SAD
         elif health < 7:
             return HEALTH.OK
         else:
             return HEALTH.HAPPY
+
+    def getSpeed(self) -> int:
+        return 5 + self.health
+
+    def getMotivation(self) -> MOTIVATION:
+        motivation = self.motivation
+        if motivation < 4:
+            return MOTIVATION.SAD
+        elif motivation < 7:
+            return MOTIVATION.OK
+        else:
+            return MOTIVATION.HAPPY
 
 
 class Backend:
@@ -66,6 +90,12 @@ class Backend:
         if len(self.foodlist) < self.FOOD_PER_ROUND:
             raise Exception("Not enough food objects")
         return [FOOD for FOOD in random.sample(self.foodlist, k=self.FOOD_PER_ROUND)]
+
+    def get_player(self) -> player:
+        self.player = player()
+        return self.player
+    def get_text(self) -> str:
+        return str(self.player.health)
 
 
 def read_food_from_file(filename: str) -> List[food]:
@@ -86,3 +116,38 @@ def test():
 
 if __name__ == '__main__':
     test()
+
+
+class healthBar:
+    image_file: str
+    player: player
+    sprite: arcade.Sprite
+
+    def __init__(self, player):
+        self.player = player
+        self.get_image()
+
+    def get_image(self):
+        Hp: int = self.player.getHealth().value
+        Mp: int = self.player.getMotivation().value
+        self.image_file = f"health/imgs/BarStates/Hp{Hp}Mp{Mp}.jpg"
+        scale = 1 / 4
+        self.sprite = arcade.Sprite(self.image_file, scale=scale)
+
+    def get_text(self) -> str:
+        return str(player.motivation)
+
+
+class Action(arcade.Sprite):
+    name: str
+    health: int
+    motivation: int
+    image_file: str
+
+    def __init__(self, line: List[str]):
+        self.name = line[0]
+        self.health = int(line[1])
+        self.motivation = int(line[2])
+        self.image_file = line[3]
+        scale = ACTION_SCALE / Image.open(f"health/imgs/{self.image_file}").size[0]
+        super().__init__(f"health/imgs/{self.image_file}", scale=scale)
