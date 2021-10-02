@@ -11,7 +11,7 @@ class food:
     name: str
     health: int
     hapiness: int
-    image_file: str  # TODO
+    image_file: str
     game_object: Union[pygame.Surface, SurfaceType] = field(init=False)
 
     def __post_init__(self):
