@@ -19,6 +19,7 @@ SCREEN_WIDTH = 1920
 SCREEN_HEIGHT = 1024
 SCREEN_TITLE = "Vitality Trainer"
 FOOD_FILE = "health/data/food.csv"
+ACTIONS_FILE = "health/data/ActionEvents.csv"
 LAYER_NAME_FOOD = "food"
 LAYER_NAME_PLAYER = "player"
 LAYER_NAME_HEALTHBAR = "bar"
@@ -60,6 +61,7 @@ class MyGame(arcade.Window):
     healthBar: backend.healthBar
     SETUP: bool = False
     TEXT_PLACED: bool = False
+
     def __init__(self, width, height, title):
         super().__init__(width, height, title, vsync=True)
 
@@ -73,10 +75,10 @@ class MyGame(arcade.Window):
         # If you have sprite lists, you should create them here,
         # and set them to None
 
-    def get_food(self):
+    def get_events(self):
         if self.FOOD_PLACED:
             self.scene.remove_sprite_list_by_name(LAYER_NAME_FOOD)
-        self.foodlist = self.gameBackend.get_food()
+        self.foodlist = self.gameBackend.get_events()
         position_sprites(self.foodlist, self.scene)
         self.FOOD_PLACED = True
 
@@ -85,13 +87,14 @@ class MyGame(arcade.Window):
         # Create your sprites and sprite lists here
         self.FOOD_PLACED = False
         self.BAR_PLACED = False
-        self.gameBackend = backend.Backend(FOOD_FILE)
+        self.TEXT_PLACED = False
+        self.gameBackend = backend.Backend(FOOD_FILE, ACTIONS_FILE)
         arcade.set_background_color(arcade.color.WHITE)
         self.manager = arcade.gui.UIManager()
         self.manager.enable()
         self.player = self.gameBackend.get_player()
         self.scene = arcade.scene.Scene()
-        self.get_food()
+        self.get_events()
         self.reset_player()
         self.scene.add_sprite(LAYER_NAME_PLAYER, self.player)
         self.healthBar = backend.healthBar(self.player)
@@ -121,16 +124,19 @@ class MyGame(arcade.Window):
         arcade.start_render()
         self.manager.draw()
         self.scene.draw()
+        # Call draw() on all your sprite lists below
+
+    def generate_text(self):
         if self.TEXT_PLACED:
             self.scene.remove_sprite_list_by_name(LAYER_NAME_TEXT)
         if self.SETUP:
-
-            text = arcade.text_pillow.create_text_sprite(self.gameBackend.get_text(), SCREEN_WIDTH - INDENT_X, 100,
+            text = arcade.text_pillow.create_text_sprite(self.gameBackend.get_text(),
+                                                         self.healthSprite.center_x - 20,
+                                                         self.healthSprite.center_y - 20,
                                                          color=arcade.color.BLUE,
-                                                         font_size=12, width=INDENT_X)
+                                                         font_size=20, width=INDENT_X)
             self.scene.add_sprite(LAYER_NAME_TEXT, text)
             self.TEXT_PLACED = True
-        # Call draw() on all your sprite lists below
 
     def on_update(self, delta_time):
         """
@@ -140,14 +146,17 @@ class MyGame(arcade.Window):
         """
 
         self.physics_engine.update()
-        food_collisions = self.player.collides_with_list(self.scene.get_sprite_list(LAYER_NAME_FOOD))
+        food_collisions = self.player.collides_with_list(
+            self.scene.get_sprite_list(LAYER_NAME_FOOD))
         self.getBar()
         for food in food_collisions:
             self.reset_player()
             self.player.eatFood(food)
-            self.get_food()
+            self.gameBackend.event()
+            self.get_events()
         if self.player.motivation < 0:
             self.game_over()
+        self.generate_text()
 
     def on_key_press(self, key, key_modifiers):
         """

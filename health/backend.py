@@ -1,18 +1,20 @@
 import csv
 import enum
 import random
-from typing import List
+from typing import List, Union
 import arcade
 import arcade.gui
 import pygame as pygame
 from PIL import Image
 
+STARTING_EVENT = 1
+
 FOOD_SCALE = 300
-
-ACTION_SCALE = 100
-
+ACTION_SCALE = 300
 MOTIVATION_LOSS: int = 5
 HEALTH_LOSS: int = 5
+FOOD_EVENTS = [1, 3, 5]
+ACTION_EVENTS = [2, 4]
 
 
 class food(arcade.Sprite):
@@ -77,25 +79,64 @@ class player(arcade.Sprite):
             return MOTIVATION.HAPPY
 
 
+class action(arcade.Sprite):
+    name: str
+    health: int
+    motivation: int
+    image_file: str
+
+    def __init__(self, line: List[str]):
+        self.name = line[0]
+        self.health = int(line[1])
+        self.motivation = int(line[2])
+        self.image_file = line[3]
+        filename = f"health/imgs/NormalActionEvents/{self.image_file}"
+        scale = ACTION_SCALE / Image.open(filename).size[0]
+        super().__init__(filename, scale=scale)
+
+
 class Backend:
     foodlist: List[food] = []
+    actionList: List[action] = []
     FOOD_PER_ROUND: int = 3
-    player: player
+    ACTIONS_PER_ROUND: int = 3
 
-    def __init__(self, foodlist):
+    player: player
+    Day: int = 1
+    Event: int = STARTING_EVENT
+
+    def __init__(self, foodlist: str, actionList: str):
         self.foodlist = read_food_from_file(foodlist)
+        self.actionList = read_actions_from_file(actionList)
         self.player = player()
 
-    def get_food(self) -> List[food]:
-        if len(self.foodlist) < self.FOOD_PER_ROUND:
-            raise Exception("Not enough food objects")
-        return [FOOD for FOOD in random.sample(self.foodlist, k=self.FOOD_PER_ROUND)]
+    def get_events(self) -> Union[List[food], List[action]]:
+        if self.Event in FOOD_EVENTS:
+            if len(self.foodlist) < self.FOOD_PER_ROUND:
+                raise Exception("Not enough food objects")
+            return [FOOD for FOOD in random.sample(self.foodlist, k=self.FOOD_PER_ROUND)]
+        elif self.Event in ACTION_EVENTS:
+            if len(self.actionList) < self.ACTIONS_PER_ROUND:
+                raise Exception("Not enough action objects")
+            return [Action for Action in random.sample(self.actionList, k=self.ACTIONS_PER_ROUND)]
+        raise Exception("Unexpected result")
 
     def get_player(self) -> player:
         self.player = player()
         return self.player
+
     def get_text(self) -> str:
-        return str(self.player.health)
+        return str(self.player.motivation)
+
+    def DayEnd(self):
+        self.Day += 1
+        self.Event = STARTING_EVENT
+
+    def event(self):
+        if self.Event < 5:
+            self.Event += 1
+        else:
+            self.DayEnd()
 
 
 def read_food_from_file(filename: str) -> List[food]:
@@ -106,6 +147,17 @@ def read_food_from_file(filename: str) -> List[food]:
             if not row:
                 break
             results.append(food(row))
+    return results
+
+
+def read_actions_from_file(filename: str) -> List[action]:
+    results = []
+    with open(filename) as file:
+        rows = csv.reader(file)
+        for row in rows:
+            if not row:
+                break
+            results.append(action(row))
     return results
 
 
@@ -136,18 +188,3 @@ class healthBar:
 
     def get_text(self) -> str:
         return str(player.motivation)
-
-
-class Action(arcade.Sprite):
-    name: str
-    health: int
-    motivation: int
-    image_file: str
-
-    def __init__(self, line: List[str]):
-        self.name = line[0]
-        self.health = int(line[1])
-        self.motivation = int(line[2])
-        self.image_file = line[3]
-        scale = ACTION_SCALE / Image.open(f"health/imgs/{self.image_file}").size[0]
-        super().__init__(f"health/imgs/{self.image_file}", scale=scale)
