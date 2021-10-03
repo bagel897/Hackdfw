@@ -125,8 +125,8 @@ class Backend:
         self.player = player()
         return self.player
 
-    def get_text(self) -> str:
-        return str(self.player.motivation)
+    def get_motivation_text(self) -> str:
+        return f"Motivation: {self.player.motivation}"
 
     def DayEnd(self):
         self.Day += 1
@@ -137,6 +137,9 @@ class Backend:
             self.Event += 1
         else:
             self.DayEnd()
+
+    def get_day_text(self) -> str:
+        return f"Day: {self.Day}"
 
 
 def read_food_from_file(filename: str) -> List[food]:

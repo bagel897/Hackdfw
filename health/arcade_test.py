@@ -15,6 +15,9 @@ import arcade.gui
 
 from health import backend
 
+MOVE_SCALE = 40
+
+FONT = "Papyrus"
 SCREEN_WIDTH = 1920
 SCREEN_HEIGHT = 1024
 SCREEN_TITLE = "Vitality Trainer"
@@ -66,10 +69,8 @@ class MyGame(arcade.Window):
         super().__init__(width, height, title, vsync=True)
 
         arcade.set_background_color(arcade.color.WHITE)
-        self.left_pressed = False
-        self.right_pressed = False
-        self.up_pressed = False
-        self.down_pressed = False
+        self.change_x = 0
+        self.change_y = 0
         self.physics_engine = None
 
         # If you have sprite lists, you should create them here,
@@ -130,12 +131,21 @@ class MyGame(arcade.Window):
         if self.TEXT_PLACED:
             self.scene.remove_sprite_list_by_name(LAYER_NAME_TEXT)
         if self.SETUP:
-            text = arcade.text_pillow.create_text_sprite(self.gameBackend.get_text(),
-                                                         self.healthSprite.center_x - 20,
+            text = arcade.text_pillow.create_text_sprite(self.gameBackend.get_motivation_text(),
+                                                         self.healthSprite.center_x - 45,
                                                          self.healthSprite.center_y - 20,
-                                                         color=arcade.color.BLUE,
-                                                         font_size=20, width=INDENT_X)
+                                                         color=arcade.color.WHITE,
+                                                         font_size=20, width=INDENT_X,
+                                                         font_name=FONT)
+            text2 = arcade.text_pillow.create_text_sprite(self.gameBackend.get_day_text(),
+                                                          SCREEN_WIDTH - INDENT_X,
+                                                          40,
+                                                          color=arcade.color.RED,
+                                                          font_size=20, width=INDENT_X,
+                                                          font_name=FONT)
+
             self.scene.add_sprite(LAYER_NAME_TEXT, text)
+            self.scene.add_sprite(LAYER_NAME_TEXT, text2)
             self.TEXT_PLACED = True
 
     def on_update(self, delta_time):
@@ -144,7 +154,8 @@ class MyGame(arcade.Window):
         Normally, you'll call update() on the sprite lists that
         need it.
         """
-
+        self.player.change_y = self.change_y * delta_time * MOVE_SCALE
+        self.player.change_x = self.change_x * delta_time * MOVE_SCALE
         self.physics_engine.update()
         food_collisions = self.player.collides_with_list(
             self.scene.get_sprite_list(LAYER_NAME_FOOD))
@@ -154,7 +165,7 @@ class MyGame(arcade.Window):
             self.player.eatFood(food)
             self.gameBackend.event()
             self.get_events()
-        if self.player.motivation < 0:
+        if self.player.motivation <= 0:
             self.game_over()
         self.generate_text()
 
@@ -167,13 +178,13 @@ class MyGame(arcade.Window):
         """
 
         if key == arcade.key.UP or key == arcade.key.W:
-            self.player.change_y = self.player.getSpeed()
+            self.change_y = self.player.getSpeed()
         elif key == arcade.key.DOWN or key == arcade.key.S:
-            self.player.change_y = -self.player.getSpeed()
+            self.change_y = -self.player.getSpeed()
         elif key == arcade.key.LEFT or key == arcade.key.A:
-            self.player.change_x = -self.player.getSpeed()
+            self.change_x = -self.player.getSpeed()
         elif key == arcade.key.RIGHT or key == arcade.key.D:
-            self.player.change_x = self.player.getSpeed()
+            self.change_x = self.player.getSpeed()
 
     def on_key_release(self, key, key_modifiers):
         """
@@ -181,13 +192,13 @@ class MyGame(arcade.Window):
         """
 
         if key == arcade.key.UP or key == arcade.key.W:
-            self.player.change_y = 0
+            self.change_y = 0
         elif key == arcade.key.DOWN or key == arcade.key.S:
-            self.player.change_y = 0
+            self.change_y = 0
         elif key == arcade.key.LEFT or key == arcade.key.A:
-            self.player.change_x = 0
+            self.change_x = 0
         elif key == arcade.key.RIGHT or key == arcade.key.D:
-            self.player.change_x = 0
+            self.change_x = 0
 
     def on_mouse_motion(self, x, y, delta_x, delta_y):
         """
