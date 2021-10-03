@@ -11,10 +11,13 @@ STARTING_EVENT = 1
 
 FOOD_SCALE = 300
 ACTION_SCALE = 300
+DAILY_SCALE = 300
+
 MOTIVATION_LOSS: int = 5
 HEALTH_LOSS: int = 5
 FOOD_EVENTS = [1, 3, 5]
 ACTION_EVENTS = [2, 4]
+DAILY_EVENTS = [0]
 
 
 class food(arcade.Sprite):
@@ -32,6 +35,20 @@ class food(arcade.Sprite):
         super().__init__(f"health/imgs/FoodEvents/{self.image_file}", scale=scale)
 
 
+class daily(arcade.Sprite):
+    day: int
+    image_file: str
+    motivation: int = 0
+    health: int = 0
+
+    def __init__(self, line: List[str]):
+        self.day = int(line[0])
+        self.image_file = line[1]
+        filename = f"health/imgs/DayStatus/Day{self.day}{self.image_file}"
+        scale = DAILY_SCALE / Image.open(filename).size[0]
+        super().__init__(filename, scale=scale)
+
+
 class HEALTH(enum.Enum):
     SAD = 0
     OK = 1
@@ -42,6 +59,13 @@ class MOTIVATION(enum.Enum):
     SAD = 0
     OK = 1
     HAPPY = 2
+
+
+class STATUS(enum.Enum):
+    WON = 0
+    SELECT = 1
+    DAILY = 2
+    LOSS = 3
 
 
 class player(arcade.Sprite):
@@ -98,6 +122,7 @@ class action(arcade.Sprite):
 class Backend:
     foodlist: List[food] = []
     actionList: List[action] = []
+    dailyList: List[daily] = []
     FOOD_PER_ROUND: int = 3
     ACTIONS_PER_ROUND: int = 3
 
@@ -105,12 +130,13 @@ class Backend:
     Day: int = 1
     Event: int = STARTING_EVENT
 
-    def __init__(self, foodlist: str, actionList: str):
+    def __init__(self, foodlist: str, actionList: str, dailyList: str):
         self.foodlist = read_food_from_file(foodlist)
         self.actionList = read_actions_from_file(actionList)
+        self.dailyList = read_status_from_file(dailyList)
         self.player = player()
 
-    def get_events(self) -> Union[List[food], List[action]]:
+    def get_events(self) -> Union[List[food], List[action], List[daily]]:
         if self.Event in FOOD_EVENTS:
             if len(self.foodlist) < self.FOOD_PER_ROUND:
                 raise Exception("Not enough food objects")
@@ -120,6 +146,9 @@ class Backend:
                 raise Exception("Not enough action objects")
             return [Action for Action in random.sample(self.actionList, k=self.ACTIONS_PER_ROUND)]
         raise Exception("Unexpected result")
+
+    def getDay(self):
+        return self.dailyList[self.Day - 1]
 
     def get_player(self) -> player:
         self.player = player()
@@ -132,14 +161,23 @@ class Backend:
         self.Day += 1
         self.Event = STARTING_EVENT
 
-    def event(self):
-        if self.Event < 5:
-            self.Event += 1
+    def event(self) -> STATUS:
+        if (self.player.health < 0) or (self.player.motivation < 0):
+            return STATUS.LOSS
+        elif self.Day == len(self.dailyList):
+            return STATUS.WON
+        elif self.Event <= 5:
+            return STATUS.SELECT
         else:
             self.DayEnd()
+            return STATUS.DAILY
 
     def get_day_text(self) -> str:
-        return f"Day: {self.Day}"
+        return f"Day: {self.getDay().day}"
+
+    def process(self, food):
+        self.Event += 1
+        self.player.eatFood(food)
 
 
 def read_food_from_file(filename: str) -> List[food]:
@@ -161,6 +199,17 @@ def read_actions_from_file(filename: str) -> List[action]:
             if not row:
                 break
             results.append(action(row))
+    return results
+
+
+def read_status_from_file(filename: str) -> List[daily]:
+    results = []
+    with open(filename) as file:
+        rows = csv.reader(file)
+        for row in rows:
+            if not row:
+                break
+            results.append(daily(row))
     return results
 
 

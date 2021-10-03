@@ -23,6 +23,7 @@ SCREEN_HEIGHT = 1024
 SCREEN_TITLE = "Vitality Trainer"
 FOOD_FILE = "health/data/food.csv"
 ACTIONS_FILE = "health/data/ActionEvents.csv"
+DAILY_FILE = "health/data/DailyBrief.csv"
 LAYER_NAME_FOOD = "food"
 LAYER_NAME_PLAYER = "player"
 LAYER_NAME_HEALTHBAR = "bar"
@@ -37,15 +38,35 @@ BALLOON_START: int = 100
 
 
 def position_sprites(sprites: List[arcade.Sprite], scene: arcade.Scene):
-    spacing = int(INDENT_X * 2 / (len(sprites) - 1))
-    positons = range(int(CENTER_X - INDENT_X), int(CENTER_X + INDENT_X + spacing), spacing)
+    if len(sprites) > 1:
+        spacing = int(INDENT_X * 2 / (len(sprites) - 1))
+        positions = range(int(CENTER_X - INDENT_X), int(CENTER_X + INDENT_X + spacing), spacing)
+    else:
+        positions = [CENTER_X]
     for i, sprite in enumerate(sprites):
-        sprite.center_x = positons[i]
+        sprite.center_x = positions[i]
         sprite.center_y = CENTER_Y + INDENT_Y
         scene.add_sprite(LAYER_NAME_FOOD, sprite)
 
 
-class MyGame(arcade.Window):
+class Intro(arcade.View):
+    def on_show(self):
+        arcade.set_background_color(arcade.color.WHITE)
+
+    def on_draw(self):
+        arcade.start_render()
+        arcade.draw_text("Instructions Screen", SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2,
+                         arcade.color.BLACK, font_size=50, anchor_x="center")
+        arcade.draw_text("Click to advance", SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 75,
+                         arcade.color.GRAY, font_size=20, anchor_x="center")
+
+    def on_mouse_press(self, _x, _y, _button, _modifiers):
+        game_view = MyGame()
+        game_view.setup()
+        self.window.show_view(game_view)
+
+
+class MyGame(arcade.View):
     """
     Main application class.
 
@@ -65,8 +86,8 @@ class MyGame(arcade.Window):
     SETUP: bool = False
     TEXT_PLACED: bool = False
 
-    def __init__(self, width, height, title):
-        super().__init__(width, height, title, vsync=True)
+    def __init__(self):
+        super().__init__()
 
         arcade.set_background_color(arcade.color.WHITE)
         self.change_x = 0
@@ -89,17 +110,17 @@ class MyGame(arcade.Window):
         self.FOOD_PLACED = False
         self.BAR_PLACED = False
         self.TEXT_PLACED = False
-        self.gameBackend = backend.Backend(FOOD_FILE, ACTIONS_FILE)
+        self.gameBackend = backend.Backend(FOOD_FILE, ACTIONS_FILE, DAILY_FILE)
         arcade.set_background_color(arcade.color.WHITE)
         self.manager = arcade.gui.UIManager()
         self.manager.enable()
         self.player = self.gameBackend.get_player()
         self.scene = arcade.scene.Scene()
-        self.get_events()
         self.reset_player()
         self.scene.add_sprite(LAYER_NAME_PLAYER, self.player)
         self.healthBar = backend.healthBar(self.player)
         self.physics_engine = arcade.PhysicsEngineSimple(self.player, [])
+        self.event_handler()
         self.SETUP = True
 
     def getBar(self):
@@ -159,15 +180,14 @@ class MyGame(arcade.Window):
         self.physics_engine.update()
         food_collisions = self.player.collides_with_list(
             self.scene.get_sprite_list(LAYER_NAME_FOOD))
-        self.getBar()
-        for food in food_collisions:
+        if len(food_collisions) >= 1:
             self.reset_player()
-            self.player.eatFood(food)
-            self.gameBackend.event()
-            self.get_events()
+            self.gameBackend.process(food_collisions[0])
+            self.event_handler()
+            if len(food_collisions) > 1:
+                print("Multiple collision")
         if self.player.motivation <= 0:
             self.game_over()
-        self.generate_text()
 
     def on_key_press(self, key, key_modifiers):
         """
@@ -215,9 +235,8 @@ class MyGame(arcade.Window):
         pass
 
     def game_over(self):
-        messagebox = arcade.gui.UIMessageBox(width=300, height=200, message_text="You Lost")
-        self.manager.add(messagebox)
-        self.setup()
+        gameover = GameOver()
+        self.window.show_view(gameover)
 
     def on_mouse_release(self, x, y, button, key_modifiers):
         """
@@ -225,11 +244,101 @@ class MyGame(arcade.Window):
         """
         pass
 
+    def event_handler(self):
+        event = self.gameBackend.event()
+        if event is backend.STATUS.DAILY:
+            new_view = DailyView(self.gameBackend, self)
+            self.window.show_view(new_view)
+        elif event is backend.STATUS.WON:
+            minigame = MiniGame(backend)
+            self.window.show_view(minigame)
+        elif event is backend.STATUS.SELECT:
+            self.get_events()
+        elif event is backend.STATUS.LOSS:
+            self.game_over()
+        self.getBar()
+        self.generate_text()
+
+    def release_all(self):
+        self.change_y = 0
+        self.change_x = 0
+
+
+class DailyView(arcade.View):
+    def __init__(self, backend: backend.Backend, gameView: MyGame):
+        super().__init__()
+        self.backend = backend
+        self.game_view = gameView
+
+    def on_show(self):
+        arcade.set_background_color(arcade.color.WHITE)
+
+    def on_draw(self):
+        arcade.start_render()
+        arcade.draw_text(self.backend.get_day_text(), SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2,
+                         arcade.color.RED, font_size=50, anchor_x="center")
+        arcade.draw_text("Click to advance", SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 75,
+                         arcade.color.GRAY, font_size=20, anchor_x="center")
+
+    def on_mouse_press(self, _x, _y, _button, _modifiers):
+        self.game_view.release_all()
+        self.window.show_view(self.game_view)
+
+
+class GameOver(arcade.View):
+    def on_show(self):
+        arcade.set_background_color(arcade.color.WHITE)
+
+    def on_draw(self):
+        arcade.start_render()
+        arcade.draw_text("Game Over", SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2,
+                         arcade.color.BLACK, font_size=50, anchor_x="center")
+        arcade.draw_text("Click to exit", SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 75,
+                         arcade.color.GRAY, font_size=20, anchor_x="center")
+
+    def on_mouse_press(self, _x, _y, _button, _modifiers):
+        exit()
+
+
+class MiniGame(arcade.View):
+    def __init__(self, backend):
+        super().__init__()
+
+    def on_show(self):
+        arcade.set_background_color(arcade.color.WHITE)
+
+    def on_draw(self):
+        arcade.start_render()
+        arcade.draw_text("Minigame Placeholder", SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2,
+                         arcade.color.BLACK, font_size=50, anchor_x="center")
+        arcade.draw_text("Click to advance", SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 75,
+                         arcade.color.GRAY, font_size=20, anchor_x="center")
+
+    def on_mouse_press(self, _x, _y, _button, _modifiers):
+        next_view = GameEnd()
+        self.window.show_view(next_view)
+
+
+class GameEnd(arcade.View):
+    def on_show(self):
+        arcade.set_background_color(arcade.color.WHITE)
+
+    def on_draw(self):
+        arcade.start_render()
+        arcade.draw_text("YOU WON!", SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2,
+                         arcade.color.BLACK, font_size=50, anchor_x="center")
+        arcade.draw_text("Click to exit", SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 75,
+                         arcade.color.GRAY, font_size=20, anchor_x="center")
+
+    def on_mouse_press(self, _x, _y, _button, _modifiers):
+        exit()
+
 
 def main():
     """ Main function """
-    game = MyGame(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
-    game.setup()
+    window = arcade.Window(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE, vsync=True)
+    game = Intro()
+    window.show_view(game)
     arcade.run()
 
 
