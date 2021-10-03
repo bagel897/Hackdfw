@@ -190,7 +190,7 @@ class MyGame(arcade.View):
             new_view = DailyView(self.gameBackend, self)
             self.window.show_view(new_view)
         elif event is STATUS.WON:
-            minigame = MiniGame(self.gameBackend, self.window, self)
+            minigame = MiniGame(self.gameBackend, self.window, self,GameOver,GameEnd)
             self.window.show_view(minigame)
         elif event is STATUS.SELECT:
             self.get_events()
