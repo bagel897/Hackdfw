@@ -17,11 +17,9 @@ import arcade.gui
 from health import backend
 from health.backend import STATUS
 
-MOVE_SCALE = 50
-
 FONT = "Papyrus"
 SCREEN_WIDTH = 1920
-SCREEN_HEIGHT = 1024
+SCREEN_HEIGHT = 1080
 SCREEN_TITLE = "Vitality Trainer"
 FOOD_FILE = "health/data/food.csv"
 ACTIONS_FILE = "health/data/ActionEvents.csv"
@@ -46,7 +44,8 @@ OFFSET_STATUS_X: int = 200
 def position_sprites(sprites: List[arcade.Sprite], scene: arcade.Scene):
     if len(sprites) > 1:
         spacing = int(INDENT_X * 2 / (len(sprites) - 1))
-        positions = range(int(CENTER_X - INDENT_X), int(CENTER_X + INDENT_X + spacing), spacing)
+        positions = list(range(int(CENTER_X - INDENT_X), int(CENTER_X + INDENT_X + spacing),
+                               spacing))
     else:
         positions = [CENTER_X]
     for i, sprite in enumerate(sprites):
@@ -56,6 +55,9 @@ def position_sprites(sprites: List[arcade.Sprite], scene: arcade.Scene):
 
 
 class Intro(arcade.View):
+    def __init__(self, window):
+        super().__init__(window)
+
     def on_show(self):
         arcade.set_background_color(arcade.color.WHITE)
 
@@ -67,7 +69,7 @@ class Intro(arcade.View):
                          arcade.color.GRAY, font_size=20, anchor_x="center")
 
     def on_mouse_press(self, _x, _y, _button, _modifiers):
-        game_view = MyGame()
+        game_view = MyGame(self.window)
         game_view.setup()
         self.window.show_view(game_view)
 
@@ -92,11 +94,10 @@ class MyGame(arcade.View):
     SETUP: bool = False
     TEXT_PLACED: bool = False
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, window):
+        super().__init__(window)
+        self.window = window
         arcade.set_background_color(arcade.color.WHITE)
-        self.change_x = 0
-        self.change_y = 0
         self.physics_engine = None
 
         # If you have sprite lists, you should create them here,
@@ -127,10 +128,8 @@ class MyGame(arcade.View):
         self.manager.enable()
         self.player = self.gameBackend.get_player()
         self.scene = arcade.scene.Scene()
-        self.reset_player()
         self.scene.add_sprite(LAYER_NAME_PLAYER, self.player)
         self.healthBar = backend.healthBar(self.player)
-        self.physics_engine = arcade.PhysicsEngineSimple(self.player, [])
         self.getBar()
         self.generate_text()
         self.SETUP = True
@@ -143,10 +142,6 @@ class MyGame(arcade.View):
         self.healthSprite.center_x = (self.healthSprite.width / 2) + 20
         self.healthSprite.center_y = self.healthSprite.height / 2 + 27
         self.scene.add_sprite(LAYER_NAME_HEALTHBAR, self.healthSprite)
-
-    def reset_player(self):
-        self.player.center_y = SCREEN_HEIGHT / 2 - BALLOON_START
-        self.player.center_x = SCREEN_WIDTH / 2
 
     def on_draw(self):
         """
@@ -187,26 +182,16 @@ class MyGame(arcade.View):
         Normally, you'll call update() on the sprite lists that
         need it.
         """
-        self.player.change_y = self.change_y * delta_time * MOVE_SCALE
-        self.player.change_x = self.change_x * delta_time * MOVE_SCALE
-        self.physics_engine.update()
-        if self.FOOD_PLACED:
-            food_collisions = self.player.collides_with_list(
-                self.scene.get_sprite_list(LAYER_NAME_FOOD))
-            if len(food_collisions) >= 1:
-                self.reset_player()
-                self.gameBackend.process(food_collisions[0])
-                if len(food_collisions) > 1:
-                    print("Multiple collision")
         self.event_handler(True)
 
     def event_handler(self, DAILY):
         event = self.gameBackend.event()
         if event is STATUS.DAILY and DAILY:
+            # new_view = MiniGame(self.gameBackend, self.window)
             new_view = DailyView(self.gameBackend, self)
             self.window.show_view(new_view)
         elif event is STATUS.WON:
-            minigame = MiniGame(self.gameBackend)
+            minigame = MiniGame(self.gameBackend, self.window, self)
             self.window.show_view(minigame)
         elif event is STATUS.SELECT:
             self.get_events()
@@ -214,7 +199,7 @@ class MyGame(arcade.View):
             self.generate_text()
         elif event is STATUS.LOSS:
             print("GAMEOVER")
-            gameover = GameOver()
+            gameover = GameOver(self)
             print("GAMEOVER2")
             self.window.show_view(gameover)
 
@@ -225,53 +210,46 @@ class MyGame(arcade.View):
         For a full list of keys, see:
         https://api.arcade.academy/en/latest/arcade.key.html
         """
-
-        if key == arcade.key.UP or key == arcade.key.W:
-            self.change_y = self.player.getSpeed()
-        elif key == arcade.key.DOWN or key == arcade.key.S:
-            self.change_y = -self.player.getSpeed()
-        elif key == arcade.key.LEFT or key == arcade.key.A:
-            self.change_x = -self.player.getSpeed()
-        elif key == arcade.key.RIGHT or key == arcade.key.D:
-            self.change_x = self.player.getSpeed()
+        pass
 
     def on_key_release(self, key, key_modifiers):
         """
         Called whenever the user lets off a previously pressed key.
         """
-
-        if key == arcade.key.UP or key == arcade.key.W:
-            self.change_y = 0
-        elif key == arcade.key.DOWN or key == arcade.key.S:
-            self.change_y = 0
-        elif key == arcade.key.LEFT or key == arcade.key.A:
-            self.change_x = 0
-        elif key == arcade.key.RIGHT or key == arcade.key.D:
-            self.change_x = 0
+        pass
 
     def on_mouse_motion(self, x, y, delta_x, delta_y):
         """
         Called whenever the mouse moves.
         """
-
-        pass
+        self.player.center_y = y
+        self.player.center_x = x
 
     def on_mouse_press(self, x, y, button, key_modifiers):
         """
         Called when the user presses a mouse button.
         """
-
+        if self.FOOD_PLACED:
+            food_collisions = self.player.collides_with_list(
+                self.scene.get_sprite_list(LAYER_NAME_FOOD))
+            if len(food_collisions) >= 1:
+                self.gameBackend.process(food_collisions[0])
+                if len(food_collisions) > 1:
+                    print("Multiple collision")
+        self.event_handler(True)
         pass
 
     def on_mouse_release(self, x, y, button, key_modifiers):
         """
         Called when a user releases a mouse button.
         """
+
         pass
 
     def release_all(self):
         self.change_y = 0
         self.change_x = 0
+        self.window.set_mouse_visible(False)
 
 
 class DailyView(arcade.View):
@@ -303,6 +281,10 @@ class DailyView(arcade.View):
 
 
 class GameOver(arcade.View):
+    def __init__(self, GameView):
+        super().__init__()
+        self.GameView = GameView
+
     def on_show(self):
         arcade.set_background_color(arcade.color.WHITE)
 
@@ -314,13 +296,13 @@ class GameOver(arcade.View):
                          arcade.color.GRAY, font_size=20, anchor_x="center")
 
     def on_mouse_press(self, _x, _y, _button, _modifiers):
-        sleep(1)
         exit()
 
 
 class MiniGame(arcade.View):
-    def __init__(self, backend):
-        super().__init__()
+    def __init__(self, backend, window, GameView):
+        super().__init__(window)
+        self.GameView = GameView
 
     def on_show(self):
         arcade.set_background_color(arcade.color.WHITE)
@@ -333,13 +315,17 @@ class MiniGame(arcade.View):
                          arcade.color.GRAY, font_size=20, anchor_x="center")
 
     def on_mouse_press(self, _x, _y, _button, _modifiers):
-        next_view = GameEnd()
+        next_view = GameEnd(self)
         self.window.show_view(next_view)
 
 
 class GameEnd(arcade.View):
+    def __init__(self,GameView):
+        super().__init__()
+        self.GameView = GameView
     def on_show(self):
         arcade.set_background_color(arcade.color.WHITE)
+
 
     def on_draw(self):
         arcade.start_render()
@@ -354,7 +340,7 @@ class GameEnd(arcade.View):
 
 def main():
     """ Main function """
-    window = arcade.Window(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE, vsync=True)
+    window = arcade.Window(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE, vsync=True, fullscreen=True)
     game = Intro(window)
     window.show_view(game)
     arcade.run()

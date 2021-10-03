@@ -1,7 +1,7 @@
 import csv
 import enum
 import random
-from typing import List, Union
+from typing import List, Union, Tuple
 
 import arcade
 import arcade.gui
@@ -138,7 +138,7 @@ class Backend:
         self.dailyList = read_status_from_file(dailyList)
         self.player = player()
 
-    def get_events(self) -> (Union[List[food], List[action]], arcade.Sprite):
+    def get_events(self) -> Tuple[Union[List[food], List[action]], arcade.Sprite]:
         if self.Event in FOOD_EVENTS:
             if len(self.foodlist) < self.FOOD_PER_ROUND:
                 raise Exception("Not enough food objects")
@@ -172,7 +172,7 @@ class Backend:
         self.prev = STARTING_EVENT - 1
 
     def event(self) -> STATUS:
-        if (self.player.health < 0) or (self.player.motivation < 0):
+        if (self.player.health <= 0) or (self.player.motivation <= 0):
             return STATUS.LOSS
         elif self.Day == len(self.dailyList):
             return STATUS.WON
@@ -181,6 +181,7 @@ class Backend:
         elif self.prev < self.Event:
             self.prev += 1
             return STATUS.SELECT
+        return STATUS.NONE
 
     def get_day_text(self) -> str:
         return f"Day: {self.getDay().day}"
