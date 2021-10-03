@@ -30,13 +30,17 @@ LAYER_NAME_FOOD = "food"
 LAYER_NAME_PLAYER = "player"
 LAYER_NAME_HEALTHBAR = "bar"
 LAYER_NAME_TEXT = "text"
+LAYER_NAME_STATUS = "status"
+
 START = 0
 STOP = math.pi
 CENTER_X: int = int(SCREEN_WIDTH / 2)
 CENTER_Y: int = int(SCREEN_HEIGHT / 2)
 INDENT_X: int = 400
-INDENT_Y: int = 300
-BALLOON_START: int = 100
+INDENT_Y: int = 0
+BALLOON_START: int = 400
+STATUS_Y: int = 900
+OFFSET_STATUS_X: int = 200
 
 
 def position_sprites(sprites: List[arcade.Sprite], scene: arcade.Scene):
@@ -101,8 +105,14 @@ class MyGame(arcade.View):
     def get_events(self):
         if self.FOOD_PLACED:
             self.scene.remove_sprite_list_by_name(LAYER_NAME_FOOD)
-        self.foodlist = self.gameBackend.get_events()
-        position_sprites(self.foodlist, self.scene)
+            self.scene.remove_sprite_list_by_name(LAYER_NAME_STATUS)
+        items = self.gameBackend.get_events()
+        foodlist = items[0]
+        dayStatus = items[1]
+        dayStatus.center_x = CENTER_X + OFFSET_STATUS_X
+        dayStatus.center_y = STATUS_Y
+        position_sprites(foodlist, self.scene)
+        self.scene.add_sprite(LAYER_NAME_STATUS, dayStatus)
         self.FOOD_PLACED = True
 
     def setup(self):
@@ -196,7 +206,7 @@ class MyGame(arcade.View):
             new_view = DailyView(self.gameBackend, self)
             self.window.show_view(new_view)
         elif event is STATUS.WON:
-            minigame = MiniGame(backend)
+            minigame = MiniGame(self.gameBackend)
             self.window.show_view(minigame)
         elif event is STATUS.SELECT:
             self.get_events()

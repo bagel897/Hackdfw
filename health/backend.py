@@ -138,16 +138,23 @@ class Backend:
         self.dailyList = read_status_from_file(dailyList)
         self.player = player()
 
-    def get_events(self) -> Union[List[food], List[action], List[daily]]:
+    def get_events(self) -> (Union[List[food], List[action]], arcade.Sprite):
         if self.Event in FOOD_EVENTS:
             if len(self.foodlist) < self.FOOD_PER_ROUND:
                 raise Exception("Not enough food objects")
-            return [FOOD for FOOD in random.sample(self.foodlist, k=self.FOOD_PER_ROUND)]
+            choices = [FOOD for FOOD in random.sample(self.foodlist, k=self.FOOD_PER_ROUND)]
+            filename = f"health/imgs/DayStatus/day{self.getDay().day}meal.jpg"
         elif self.Event in ACTION_EVENTS:
             if len(self.actionList) < self.ACTIONS_PER_ROUND:
                 raise Exception("Not enough action objects")
-            return [Action for Action in random.sample(self.actionList, k=self.ACTIONS_PER_ROUND)]
-        raise Exception("Unexpected result")
+            choices = [Action for Action in random.sample(self.actionList,
+                                                          k=self.ACTIONS_PER_ROUND)]
+            filename = f"health/imgs/DayStatus/day{self.getDay().day}free.jpg"
+
+        else:
+            raise Exception("Unexpected result")
+        sprite = arcade.Sprite(filename)
+        return choices, sprite
 
     def getDay(self) -> daily:
         return self.dailyList[self.Day - 1]
