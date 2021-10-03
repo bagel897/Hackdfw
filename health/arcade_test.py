@@ -41,7 +41,8 @@ STATUS_Y: int = 900
 OFFSET_STATUS_X: int = 200
 
 
-def position_sprites(sprites: List[arcade.Sprite], scene: arcade.Scene):
+def position_sprites(sprites: List[arcade.Sprite]):
+    results = arcade.SpriteList()
     if len(sprites) > 1:
         spacing = int(INDENT_X * 2 / (len(sprites) - 1))
         positions = list(range(int(CENTER_X - INDENT_X), int(CENTER_X + INDENT_X + spacing),
@@ -51,7 +52,8 @@ def position_sprites(sprites: List[arcade.Sprite], scene: arcade.Scene):
     for i, sprite in enumerate(sprites):
         sprite.center_x = positions[i]
         sprite.center_y = CENTER_Y + INDENT_Y
-        scene.add_sprite(LAYER_NAME_FOOD, sprite)
+        results.append(sprite)
+    return results
 
 
 class Intro(arcade.View):
@@ -91,14 +93,25 @@ class MyGame(arcade.View):
     gameBackend: backend.Backend
     healthSprite: arcade.Sprite
     healthBar: backend.healthBar
-    SETUP: bool = False
+    SETUP: bool
     TEXT_PLACED: bool = False
 
     def __init__(self, window):
         super().__init__(window)
         self.window = window
         arcade.set_background_color(arcade.color.WHITE)
-        self.physics_engine = None
+        self.gameBackend = backend.Backend(FOOD_FILE, ACTIONS_FILE, DAILY_FILE)
+        arcade.set_background_color(arcade.color.WHITE)
+        self.manager = arcade.gui.UIManager()
+        self.manager.enable()
+        self.player = self.gameBackend.get_player()
+        self.scene = arcade.scene.Scene()
+        self.player_list = arcade.SpriteList()
+        self.player_list.append(self.player)
+        self.scene.add_sprite_list(LAYER_NAME_PLAYER, sprite_list=self.player_list)
+        self.healthBar = backend.healthBar(self.player)
+        self.getBar()
+        self.generate_text()
 
         # If you have sprite lists, you should create them here,
         # and set them to None
@@ -112,27 +125,15 @@ class MyGame(arcade.View):
         dayStatus = items[1]
         dayStatus.center_x = CENTER_X + OFFSET_STATUS_X
         dayStatus.center_y = STATUS_Y
-        position_sprites(foodlist, self.scene)
+        self.scene.add_sprite_list_after(LAYER_NAME_FOOD, LAYER_NAME_PLAYER,
+                                         sprite_list=position_sprites(
+                                             foodlist))
         self.scene.add_sprite(LAYER_NAME_STATUS, dayStatus)
         self.FOOD_PLACED = True
 
     def setup(self):
         """ Set up the game variables. Call to re-start the game. """
         # Create your sprites and sprite lists here
-        self.FOOD_PLACED = False
-        self.BAR_PLACED = False
-        self.TEXT_PLACED = False
-        self.gameBackend = backend.Backend(FOOD_FILE, ACTIONS_FILE, DAILY_FILE)
-        arcade.set_background_color(arcade.color.WHITE)
-        self.manager = arcade.gui.UIManager()
-        self.manager.enable()
-        self.player = self.gameBackend.get_player()
-        self.scene = arcade.scene.Scene()
-        self.scene.add_sprite(LAYER_NAME_PLAYER, self.player)
-        self.healthBar = backend.healthBar(self.player)
-        self.getBar()
-        self.generate_text()
-        self.SETUP = True
 
     def getBar(self):
         if self.BAR_PLACED:
@@ -158,23 +159,22 @@ class MyGame(arcade.View):
     def generate_text(self):
         if self.TEXT_PLACED:
             self.scene.remove_sprite_list_by_name(LAYER_NAME_TEXT)
-        if self.SETUP:
-            text = arcade.text_pillow.create_text_sprite(self.gameBackend.get_motivation_text(),
-                                                         self.healthSprite.center_x - 45,
-                                                         self.healthSprite.center_y - 20,
-                                                         color=arcade.color.WHITE,
-                                                         font_size=20, width=INDENT_X,
-                                                         font_name=FONT)
-            text2 = arcade.text_pillow.create_text_sprite(self.gameBackend.get_day_text(),
-                                                          SCREEN_WIDTH - INDENT_X,
-                                                          40,
-                                                          color=arcade.color.RED,
-                                                          font_size=20, width=INDENT_X,
-                                                          font_name=FONT)
+        text = arcade.text_pillow.create_text_sprite(self.gameBackend.get_motivation_text(),
+                                                     self.healthSprite.center_x - 45,
+                                                     self.healthSprite.center_y - 20,
+                                                     color=arcade.color.WHITE,
+                                                     font_size=20, width=INDENT_X,
+                                                     font_name=FONT)
+        text2 = arcade.text_pillow.create_text_sprite(self.gameBackend.get_day_text(),
+                                                      SCREEN_WIDTH - INDENT_X,
+                                                      40,
+                                                      color=arcade.color.RED,
+                                                      font_size=20, width=INDENT_X,
+                                                      font_name=FONT)
 
-            self.scene.add_sprite(LAYER_NAME_TEXT, text)
-            self.scene.add_sprite(LAYER_NAME_TEXT, text2)
-            self.TEXT_PLACED = True
+        self.scene.add_sprite(LAYER_NAME_TEXT, text)
+        self.scene.add_sprite(LAYER_NAME_TEXT, text2)
+        self.TEXT_PLACED = True
 
     def on_update(self, delta_time):
         """
@@ -187,7 +187,6 @@ class MyGame(arcade.View):
     def event_handler(self, DAILY):
         event = self.gameBackend.event()
         if event is STATUS.DAILY and DAILY:
-            # new_view = MiniGame(self.gameBackend, self.window)
             new_view = DailyView(self.gameBackend, self)
             self.window.show_view(new_view)
         elif event is STATUS.WON:
@@ -198,9 +197,7 @@ class MyGame(arcade.View):
             self.getBar()
             self.generate_text()
         elif event is STATUS.LOSS:
-            print("GAMEOVER")
             gameover = GameOver(self)
-            print("GAMEOVER2")
             self.window.show_view(gameover)
 
     def on_key_press(self, key, key_modifiers):
@@ -320,12 +317,12 @@ class MiniGame(arcade.View):
 
 
 class GameEnd(arcade.View):
-    def __init__(self,GameView):
+    def __init__(self, GameView):
         super().__init__()
         self.GameView = GameView
+
     def on_show(self):
         arcade.set_background_color(arcade.color.WHITE)
-
 
     def on_draw(self):
         arcade.start_render()
