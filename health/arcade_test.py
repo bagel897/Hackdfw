@@ -8,14 +8,16 @@ If Python and Arcade are installed, this example can be run from the command lin
 python -m arcade.examples.starting_template
 """
 import math
+from time import sleep
 from typing import List
 
 import arcade
 import arcade.gui
 
 from health import backend
+from health.backend import STATUS
 
-MOVE_SCALE = 40
+MOVE_SCALE = 50
 
 FONT = "Papyrus"
 SCREEN_WIDTH = 1920
@@ -56,7 +58,7 @@ class Intro(arcade.View):
     def on_draw(self):
         arcade.start_render()
         arcade.draw_text("Instructions Screen", SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2,
-                         arcade.color.BLACK, font_size=50, anchor_x="center")
+                         arcade.color.RED, font_size=50, anchor_x="center")
         arcade.draw_text("Click to advance", SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 75,
                          arcade.color.GRAY, font_size=20, anchor_x="center")
 
@@ -88,7 +90,6 @@ class MyGame(arcade.View):
 
     def __init__(self):
         super().__init__()
-
         arcade.set_background_color(arcade.color.WHITE)
         self.change_x = 0
         self.change_y = 0
@@ -120,7 +121,8 @@ class MyGame(arcade.View):
         self.scene.add_sprite(LAYER_NAME_PLAYER, self.player)
         self.healthBar = backend.healthBar(self.player)
         self.physics_engine = arcade.PhysicsEngineSimple(self.player, [])
-        self.event_handler()
+        self.getBar()
+        self.generate_text()
         self.SETUP = True
 
     def getBar(self):
@@ -178,16 +180,33 @@ class MyGame(arcade.View):
         self.player.change_y = self.change_y * delta_time * MOVE_SCALE
         self.player.change_x = self.change_x * delta_time * MOVE_SCALE
         self.physics_engine.update()
-        food_collisions = self.player.collides_with_list(
-            self.scene.get_sprite_list(LAYER_NAME_FOOD))
-        if len(food_collisions) >= 1:
-            self.reset_player()
-            self.gameBackend.process(food_collisions[0])
-            self.event_handler()
-            if len(food_collisions) > 1:
-                print("Multiple collision")
-        if self.player.motivation <= 0:
-            self.game_over()
+        if self.FOOD_PLACED:
+            food_collisions = self.player.collides_with_list(
+                self.scene.get_sprite_list(LAYER_NAME_FOOD))
+            if len(food_collisions) >= 1:
+                self.reset_player()
+                self.gameBackend.process(food_collisions[0])
+                if len(food_collisions) > 1:
+                    print("Multiple collision")
+        self.event_handler(True)
+
+    def event_handler(self, DAILY):
+        event = self.gameBackend.event()
+        if event is STATUS.DAILY and DAILY:
+            new_view = DailyView(self.gameBackend, self)
+            self.window.show_view(new_view)
+        elif event is STATUS.WON:
+            minigame = MiniGame(backend)
+            self.window.show_view(minigame)
+        elif event is STATUS.SELECT:
+            self.get_events()
+            self.getBar()
+            self.generate_text()
+        elif event is STATUS.LOSS:
+            print("GAMEOVER")
+            gameover = GameOver()
+            print("GAMEOVER2")
+            self.window.show_view(gameover)
 
     def on_key_press(self, key, key_modifiers):
         """
@@ -234,30 +253,11 @@ class MyGame(arcade.View):
 
         pass
 
-    def game_over(self):
-        gameover = GameOver()
-        self.window.show_view(gameover)
-
     def on_mouse_release(self, x, y, button, key_modifiers):
         """
         Called when a user releases a mouse button.
         """
         pass
-
-    def event_handler(self):
-        event = self.gameBackend.event()
-        if event is backend.STATUS.DAILY:
-            new_view = DailyView(self.gameBackend, self)
-            self.window.show_view(new_view)
-        elif event is backend.STATUS.WON:
-            minigame = MiniGame(backend)
-            self.window.show_view(minigame)
-        elif event is backend.STATUS.SELECT:
-            self.get_events()
-        elif event is backend.STATUS.LOSS:
-            self.game_over()
-        self.getBar()
-        self.generate_text()
 
     def release_all(self):
         self.change_y = 0
@@ -269,19 +269,26 @@ class DailyView(arcade.View):
         super().__init__()
         self.backend = backend
         self.game_view = gameView
+        self.messages = arcade.SpriteList()
+        day = self.backend.getDay()
+        day.center_x = SCREEN_WIDTH / 2
+        day.center_y = SCREEN_HEIGHT / 2
+        self.messages.append(day)
 
     def on_show(self):
         arcade.set_background_color(arcade.color.WHITE)
 
     def on_draw(self):
         arcade.start_render()
-        arcade.draw_text(self.backend.get_day_text(), SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2,
-                         arcade.color.RED, font_size=50, anchor_x="center")
-        arcade.draw_text("Click to advance", SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 75,
+        self.messages.draw()
+        # arcade.draw_text(self.backend.get_day_text(), SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2,
+        #                 arcade.color.RED, font_size=50, anchor_x="center")
+        arcade.draw_text("Click to advance", SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 600,
                          arcade.color.GRAY, font_size=20, anchor_x="center")
 
     def on_mouse_press(self, _x, _y, _button, _modifiers):
         self.game_view.release_all()
+        self.backend.daily()
         self.window.show_view(self.game_view)
 
 
@@ -297,6 +304,7 @@ class GameOver(arcade.View):
                          arcade.color.GRAY, font_size=20, anchor_x="center")
 
     def on_mouse_press(self, _x, _y, _button, _modifiers):
+        sleep(1)
         exit()
 
 
@@ -337,7 +345,7 @@ class GameEnd(arcade.View):
 def main():
     """ Main function """
     window = arcade.Window(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE, vsync=True)
-    game = Intro()
+    game = Intro(window)
     window.show_view(game)
     arcade.run()
 

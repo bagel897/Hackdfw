@@ -2,16 +2,16 @@ import csv
 import enum
 import random
 from typing import List, Union
+
 import arcade
 import arcade.gui
-import pygame as pygame
 from PIL import Image
 
-STARTING_EVENT = 1
+STARTING_EVENT = 0
 
 FOOD_SCALE = 300
 ACTION_SCALE = 300
-DAILY_SCALE = 300
+DAILY_SCALE = 1500
 
 MOTIVATION_LOSS: int = 5
 HEALTH_LOSS: int = 5
@@ -44,7 +44,7 @@ class daily(arcade.Sprite):
     def __init__(self, line: List[str]):
         self.day = int(line[0])
         self.image_file = line[1]
-        filename = f"health/imgs/DayStatus/Day{self.day}{self.image_file}"
+        filename = f"health/imgs/{self.image_file}"
         scale = DAILY_SCALE / Image.open(filename).size[0]
         super().__init__(filename, scale=scale)
 
@@ -66,6 +66,7 @@ class STATUS(enum.Enum):
     SELECT = 1
     DAILY = 2
     LOSS = 3
+    NONE = 4
 
 
 class player(arcade.Sprite):
@@ -79,7 +80,7 @@ class player(arcade.Sprite):
 
     def eatFood(self, food: food):
         self.motivation = max(min(self.motivation + food.motivation, 10), -10)
-        self.health = max(min(self.health + food.health, 10), 0)
+        self.health = max(min(self.health + food.health, 10), -1)
 
     def getHealth(self) -> HEALTH:
         health = self.health
@@ -129,6 +130,7 @@ class Backend:
     player: player
     Day: int = 1
     Event: int = STARTING_EVENT
+    prev: int = STARTING_EVENT - 1
 
     def __init__(self, foodlist: str, actionList: str, dailyList: str):
         self.foodlist = read_food_from_file(foodlist)
@@ -147,7 +149,7 @@ class Backend:
             return [Action for Action in random.sample(self.actionList, k=self.ACTIONS_PER_ROUND)]
         raise Exception("Unexpected result")
 
-    def getDay(self):
+    def getDay(self) -> daily:
         return self.dailyList[self.Day - 1]
 
     def get_player(self) -> player:
@@ -160,17 +162,18 @@ class Backend:
     def DayEnd(self):
         self.Day += 1
         self.Event = STARTING_EVENT
+        self.prev = STARTING_EVENT - 1
 
     def event(self) -> STATUS:
         if (self.player.health < 0) or (self.player.motivation < 0):
             return STATUS.LOSS
         elif self.Day == len(self.dailyList):
             return STATUS.WON
-        elif self.Event <= 5:
-            return STATUS.SELECT
-        else:
-            self.DayEnd()
+        elif self.Event == 0:
             return STATUS.DAILY
+        elif self.prev < self.Event:
+            self.prev += 1
+            return STATUS.SELECT
 
     def get_day_text(self) -> str:
         return f"Day: {self.getDay().day}"
@@ -178,6 +181,12 @@ class Backend:
     def process(self, food):
         self.Event += 1
         self.player.eatFood(food)
+        if self.Event > 5:
+            self.DayEnd()
+            self.Event = STARTING_EVENT
+
+    def daily(self):
+        self.Event += 1
 
 
 def read_food_from_file(filename: str) -> List[food]:
